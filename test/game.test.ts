@@ -2,7 +2,7 @@
 // 运行:npm run test
 
 import assert from 'node:assert/strict';
-import { DAMAGE, ENERGY, GRAVITY, PHYSICS_DT, SCORING } from '../src/game/constants';
+import { DAMAGE, ENERGY, FINISH_PROTECT_DIST, GRAVITY, PHYSICS_DT, SCORING } from '../src/game/constants';
 import { LEVELS, obstaclePosition } from '../src/game/levels';
 import { buildTerrain } from '../src/game/terrain';
 import {
@@ -84,12 +84,12 @@ test('大落差(8m)着陆:冲击速度超过无伤阈值', () => {
 });
 
 test('冲击伤害公式:阈值边界与封顶', () => {
-  assert.equal(impactDamage(4.99), 0);
+  assert.equal(impactDamage(5.99), 0);
   assert.equal(impactDamage(DAMAGE.safeImpact), 0);
-  // safeImpact=5, heavyImpact=9 → 6.5 对应 (1.5/4)*25 = 9.375
-  assert.ok(Math.abs(impactDamage(6.5) - 9.375) < 1e-9);
+  // safeImpact=6, heavyImpact=9, midMax=18 → 6.5 对应 (0.5/3)*18 = 3
+  assert.ok(Math.abs(impactDamage(6.5) - 3) < 1e-9);
   assert.ok(Math.abs(impactDamage(9) - DAMAGE.midMaxDamage) < 1e-9);
-  assert.ok(impactDamage(12) > DAMAGE.midMaxDamage);
+  assert.ok(Math.abs(impactDamage(12) - (18 + 3 * 5)) < 1e-9);
   assert.equal(impactDamage(50), DAMAGE.heavyCap);
   assert.equal(isHeavyImpact(9.5), true);
   assert.equal(isHeavyImpact(8), false);
@@ -177,22 +177,46 @@ test('低速平稳驶入终点 → 过关', () => {
   assert.ok(win);
 });
 
-test('高速冲入终点 → 弹回并扣货,不判定过关', () => {
+test('高速冲入终点 → 弹回但不扣货(终点保护区)', () => {
   const level = LEVELS[0];
   const run = createRun(0, level);
   run.rover.x = level.finishX - 1;
   run.rover.y = level.terrain.groundY(run.rover.x) + 1.0;
   run.rover.vx = 15;
   const cargo0 = run.cargo;
-  let bounce = false;
   for (let i = 0; i < 60 && run.status === 'running'; i++) {
-    const evs = stepRun(run, level, level.terrain, { throttle: false, brake: false, tilt: 0 }, PHYSICS_DT);
-    if (evs.some((e) => e.type === 'damage' && e.kind === 'finish')) bounce = true;
+    stepRun(run, level, level.terrain, { throttle: false, brake: false, tilt: 0 }, PHYSICS_DT);
   }
-  assert.ok(bounce, '应产生 finish 伤害事件');
-  assert.ok(run.cargo < cargo0);
+  assert.equal(run.cargo, cargo0, '保护区内弹回不伤货物');
   assert.notEqual(run.status, 'complete');
   assert.ok(run.rover.vx <= 0, '应被弹回');
+});
+
+test('终点保护区:区内重落地/翻车均不伤货物', () => {
+  const level = LEVELS[0];
+  const run = createRun(0, level);
+  // 区内高空坠落(落速远超无伤阈值)
+  run.rover.x = level.finishX - FINISH_PROTECT_DIST + 3;
+  run.rover.y = level.terrain.groundY(run.rover.x) + 25;
+  run.rover.vy = -12;
+  const cargo0 = run.cargo;
+  for (let i = 0; i < 120 * 8 && run.status === 'running'; i++) {
+    stepRun(run, level, level.terrain, { throttle: false, brake: false, tilt: 0 }, PHYSICS_DT);
+  }
+  assert.equal(run.cargo, cargo0, '保护区内落地不伤货物');
+});
+
+test('保护区外重落地仍伤货物(对照)', () => {
+  const level = LEVELS[0];
+  const run = createRun(0, level);
+  run.rover.x = level.finishX - FINISH_PROTECT_DIST - 20;
+  run.rover.y = level.terrain.groundY(run.rover.x) + 25;
+  run.rover.vy = -12;
+  const cargo0 = run.cargo;
+  for (let i = 0; i < 120 * 8 && run.status === 'running'; i++) {
+    stepRun(run, level, level.terrain, { throttle: false, brake: false, tilt: 0 }, PHYSICS_DT);
+  }
+  assert.ok(run.cargo < cargo0, '区外落地应伤货物');
 });
 
 console.log('\n■ 检查点与复活');
@@ -372,11 +396,24 @@ function botDrive(levelIndex: number, maxTime: number) {
   return { run, t };
 }
 
+const BOT_TARGETS = [
+  { cargoMin: 99, energyMin: 10, energyMax: 40 },
+  { cargoMin: 85, energyMin: 10, energyMax: 40 },
+  { cargoMin: 60, energyMin: 5, energyMax: 25 },
+];
+
 for (let i = 0; i < LEVELS.length; i++) {
-  test(`AI 驾驶员可通关第 ${i + 1} 关「${LEVELS[i].name}」且货物完好`, () => {
+  test(`AI 驾驶员可通关第 ${i + 1} 关「${LEVELS[i].name}」(货物/能源达标)`, () => {
     const { run, t } = botDrive(i, 300);
-    assert.equal(run.status, 'complete', `状态=${run.status}, 进度 x=${run.rover.x.toFixed(1)}/${LEVELS[i].finishX}, 用时=${t.toFixed(1)}s, 货物=${run.cargo.toFixed(0)}, 能源=${run.energy.toFixed(0)}`);
-    assert.ok(run.cargo > 0);
+    const tgt = BOT_TARGETS[i];
+    const info = `状态=${run.status}, 进度 x=${run.rover.x.toFixed(1)}/${LEVELS[i].finishX}, 用时=${t.toFixed(1)}s, 货物=${run.cargo.toFixed(0)}, 能源=${run.energy.toFixed(0)}`;
+    console.log(`    → L${i + 1} ${info}`);
+    assert.equal(run.status, 'complete', info);
+    assert.ok(run.cargo >= tgt.cargoMin, `货物 ${run.cargo.toFixed(0)} < ${tgt.cargoMin}:${info}`);
+    assert.ok(
+      run.energy >= tgt.energyMin && run.energy <= tgt.energyMax,
+      `能源 ${run.energy.toFixed(0)} 不在 [${tgt.energyMin}, ${tgt.energyMax}]:${info}`,
+    );
   });
 }
 

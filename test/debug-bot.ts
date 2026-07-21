@@ -9,6 +9,9 @@ const terrain = level.terrain;
 const run = createRun(level.index, level);
 const dt = PHYSICS_DT;
 let t = 0;
+let thrTime = 0;
+let coastTime = 0;
+let batteries = 0;
 while (run.status === 'running' && t < 300) {
   const s = run.rover;
   const speed = roverSpeed(s);
@@ -65,7 +68,10 @@ while (run.status === 'running' && t < 300) {
     tilt: grounded ? 0 : Math.abs(wa) > 0.08 ? (wa > 0 ? -1 : 1) : 0,
   };
   const evs = stepRun(run, level, terrain, input, dt);
+  if (input.throttle) thrTime += dt;
+  else if (speed > 2.5) coastTime += dt;
   for (const e of evs) {
+    if (e.type === 'battery') batteries++;
     if (e.type === 'damage') {
       console.log(
         `t=${t.toFixed(2)} x=${s.x.toFixed(1)} kind=${e.kind} dmg=${e.amount.toFixed(1)} heavy=${e.heavy} speed=${speed.toFixed(1)} vy=${s.vy.toFixed(1)} angle=${(wrapAngle(s.angle) * 57.3).toFixed(0)}° cargo=${run.cargo.toFixed(0)}`,
@@ -76,4 +82,4 @@ while (run.status === 'running' && t < 300) {
   }
   t += dt;
 }
-console.log(`end: status=${run.status} x=${run.rover.x.toFixed(1)} t=${t.toFixed(1)} cargo=${run.cargo.toFixed(0)}`);
+console.log(`end: status=${run.status} x=${run.rover.x.toFixed(1)} t=${t.toFixed(1)} cargo=${run.cargo.toFixed(0)} energy=${run.energy.toFixed(0)} | thr=${thrTime.toFixed(1)}s coast=${coastTime.toFixed(1)}s batteries=${batteries}`);

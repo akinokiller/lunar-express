@@ -1,6 +1,6 @@
 // 单局运行状态:货物、能源、检查点、障碍、胜负判定 —— 纯模块
 
-import { CARGO_MAX, DAMAGE, ENERGY, SCORING } from './constants';
+import { CARGO_MAX, DAMAGE, ENERGY, FINISH_PROTECT_DIST, SCORING } from './constants';
 import {
   obstaclePosition,
   type LevelDef,
@@ -109,7 +109,11 @@ export function stepRun(
   stepRover(run.rover, terrain, effectiveInput, dt, physEvents);
   run.speed = roverSpeed(run.rover);
 
+  // 终点保护区(基地磁力软着陆/装卸保护):区内一切冲击不伤货物
+  const inFinishSafeZone = run.rover.x >= level.finishX - FINISH_PROTECT_DIST;
+
   for (const ev of physEvents) {
+    if (inFinishSafeZone) break;
     if (ev.type === 'impact') {
       applyDamage(run, events, impactDamage(ev.vn), 'impact', isHeavyImpact(ev.vn), ev.x, ev.y);
     } else {
@@ -160,7 +164,7 @@ export function stepRun(
     const dx = run.rover.x - pos.x;
     const dy = run.rover.y - pos.y;
     const dist = Math.hypot(dx, dy);
-    if (dist < ob.r + 1.15 && run.obstacleCooldowns[i] <= 0) {
+    if (dist < ob.r + 1.15 && run.obstacleCooldowns[i] <= 0 && !inFinishSafeZone) {
       const closing = run.speed + ob.speed * 0.5;
       const dmg = Math.min(
         DAMAGE.obstacleCap,
@@ -176,7 +180,7 @@ export function stepRun(
     }
   }
 
-  // 终点:平稳驶入过关,高速冲入弹回并扣货
+  // 终点:平稳驶入过关;高速冲入弹回(保护区内弹回与落地均不伤货物)
   if (run.finishCooldown > 0) run.finishCooldown -= dt;
   if (run.rover.x >= level.finishX) {
     const grounded = run.rover.wheelGrounded[0] || run.rover.wheelGrounded[1];
@@ -186,7 +190,6 @@ export function stepRun(
       return events;
     }
     if (run.finishCooldown <= 0 && run.rover.x < level.finishX + 8) {
-      applyDamage(run, events, DAMAGE.finishDamage, 'finish', true, run.rover.x, run.rover.y);
       run.rover.vx = -Math.abs(run.rover.vx) * 0.35;
       run.rover.vy = Math.max(run.rover.vy, 2.5);
       run.finishCooldown = 1.2;

@@ -161,7 +161,7 @@ export const LEVELS: LevelDef[] = [
       { kind: 'flat', len: 55 },
     ],
     checkpointFracs: [0.33, 0.66],
-    batteryFracs: [0.22, 0.52, 0.8],
+    batteryFracs: [0.55],
     obstacles: [
       { kind: 'drone', xFrac: 0.86, range: 12, speed: 2.2, r: 0.9, alt: 3.2 },
     ],
@@ -191,7 +191,7 @@ export const LEVELS: LevelDef[] = [
       { kind: 'flat', len: 55 },
     ],
     checkpointFracs: [0.25, 0.5, 0.75],
-    batteryFracs: [0.18, 0.4, 0.62, 0.85],
+    batteryFracs: [0.35, 0.7],
     obstacles: [
       // 障碍一律放在平坦路段且远离坑沿;无人机浮沉封路,滚石大范围巡逻
       { kind: 'drone', xFrac: 0.5, range: 6, speed: 2.4, r: 0.9, alt: 3.3 },
@@ -226,7 +226,7 @@ export const LEVELS: LevelDef[] = [
       { kind: 'flat', len: 60 },
     ],
     checkpointFracs: [0.25, 0.5, 0.75],
-    batteryFracs: [0.15, 0.35, 0.55, 0.72, 0.88],
+    batteryFracs: [0.14, 0.3, 0.46, 0.6, 0.68, 0.76],
     obstacles: [
       // 全部位于平坦路段(坑洞/陡坡只考驾驶,障碍只考时机)
       { kind: 'drone', xFrac: 0.28, range: 5, speed: 3.0, r: 0.9, alt: 3.3 },

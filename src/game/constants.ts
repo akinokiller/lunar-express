@@ -36,29 +36,31 @@ export const ROVER = {
 
 export const DAMAGE = {
   /** 法向冲击速度低于此值完全无伤 */
-  safeImpact: 5,
+  safeImpact: 6,
   /** 超过此值判定为重击(屏幕震动) */
   heavyImpact: 9,
   /** 恰好达到 heavyImpact 时的伤害 */
-  midMaxDamage: 25,
-  heavyExtraPerMS: 8,
-  heavyCap: 60,
+  midMaxDamage: 18,
+  heavyExtraPerMS: 5,
+  heavyCap: 45,
   /** 翻车(车顶着地)基础伤害 */
-  roofBase: 14,
+  roofBase: 10,
   roofMinImpact: 2.0,
   /** 移动障碍 */
-  obstacleBase: 8,
-  obstaclePerMS: 1.6,
-  obstacleCap: 24,
-  /** 高速冲入终点 */
+  obstacleBase: 5.5,
+  obstaclePerMS: 0.9,
+  obstacleCap: 14,
+  /** 高速冲入终点的弹回速度阈值(弹回保留,但终点保护区内不伤货物) */
   finishSpeedLimit: 5.5,
-  finishDamage: 12,
 } as const;
+
+/** 终点保护区:距终点此距离内冲击不伤货物(基地磁力软着陆/装卸保护) */
+export const FINISH_PROTECT_DIST = 18;
 
 export const ENERGY = {
   max: 100,
-  throttlePerSec: 1.9,
-  coastRegenPerSec: 1.1,
+  throttlePerSec: 5.7,
+  coastRegenPerSec: 0.4,
   /** 仅当滑行速度高于此值才动能回充(静止爬行不回充) */
   regenMinSpeed: 2.5,
   batteryValue: 35,
